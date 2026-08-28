@@ -391,10 +391,43 @@ selected_class = st.selectbox(
 )
 
 
-subject_options = sorted(
+# ============================================================
+# SECTION
+# ============================================================
+
+section_options = sorted(
     df.loc[
         (df["week_name"] == selected_week)
         & (df["class_name"] == selected_class),
+        "section"
+    ]
+    .dropna()
+    .astype(str)
+    .str.strip()
+    .loc[lambda s: s != ""]
+    .unique()
+    .tolist()
+)
+
+if not section_options:
+    st.warning("No sections found for the selected week and class.")
+    st.stop()
+
+selected_section = st.selectbox(
+    "Select Section",
+    options=section_options
+)
+
+
+# ============================================================
+# SUBJECT
+# ============================================================
+
+subject_options = sorted(
+    df.loc[
+        (df["week_name"] == selected_week)
+        & (df["class_name"] == selected_class)
+        & (df["section"] == selected_section),
         "subject_name"
     ]
     .dropna()
@@ -403,7 +436,9 @@ subject_options = sorted(
 )
 
 if not subject_options:
-    st.warning("No subjects found for the selected week and class.")
+    st.warning(
+        "No subjects found for the selected week, class and section."
+    )
     st.stop()
 
 selected_subject = st.selectbox(
@@ -413,19 +448,46 @@ selected_subject = st.selectbox(
 
 
 # ============================================================
-# FILTER SELECTED WEEK / CLASS / SUBJECT
+# FILTER SELECTED WEEK / CLASS / SECTION / SUBJECT
 # ============================================================
 
 filtered_df = df[
     (df["week_name"] == selected_week)
     & (df["class_name"] == selected_class)
+    & (df["section"] == selected_section)
     & (df["subject_name"] == selected_subject)
 ].copy()
 
 
-# Only valid numeric marks participate in averages.
+# ============================================================
+# VALID MARKS
+# Absent / OD / SB / P / NC / Holiday / Not Conducted
+# records do not participate in performance calculations.
+# A genuine numeric 0 remains a valid mark.
+# ============================================================
+
+EXCLUDED_STATUSES = {
+    "absent",
+    "od",
+    "sb",
+    "p",
+    "nc",
+    "holiday",
+    "not conducted",
+    "not_conducted",
+}
+
+status_normalized = (
+    filtered_df["status"]
+    .fillna("")
+    .astype(str)
+    .str.strip()
+    .str.lower()
+)
+
 valid_df = filtered_df[
     filtered_df["marks"].notna()
+    & ~status_normalized.isin(EXCLUDED_STATUSES)
 ].copy()
 
 if valid_df.empty:
@@ -479,15 +541,32 @@ class_average = float(student_weekly["marks"].mean())
 # REPORT CATEGORIES
 # ============================================================
 
-# Rank by highest weekly average.
+# Rank by highest weekly average using DENSE RANKING.
+#
+# Example:
+#   4.75 -> 1st
+#   4.75 -> 1st
+#   4.50 -> 2nd
+#
+# This means a tie for 1st does not consume the 2nd-place rank.
 ranked_df = student_weekly.sort_values(
     ["marks", "student_name"],
     ascending=[False, True]
 ).reset_index(drop=True)
 
+ranked_df["rank"] = (
+    ranked_df["marks"]
+    .rank(
+        method="dense",
+        ascending=False
+    )
+    .astype(int)
+)
 
-# Exactly first and second students in the sorted performance list.
-toppers_df = ranked_df.head(2).copy()
+# Include every student holding the 1st or 2nd rank.
+toppers_df = ranked_df[
+    ranked_df["rank"] <= 2
+].copy()
 
 
 above_average_df = ranked_df[
@@ -562,6 +641,7 @@ else:
 
 st.write(f"**Week:** {selected_week}")
 st.write(f"**Class:** {selected_class}")
+st.write(f"**Section:** {selected_section}")
 st.write(f"**Subject:** {selected_subject}")
 
 if start_text and end_text:
@@ -577,12 +657,34 @@ st.metric("Class Average", f"{class_average:.2f} / 5")
 st.divider()
 st.subheader("1. First and Second Place")
 
-topper_display = toppers_df[["student_name", "marks"]].copy()
-topper_display.columns = ["Student Name", "Average"]
-topper_display.insert(0, "Place", ["1st Place", "2nd Place"][:len(topper_display)])
+topper_display = toppers_df[
+    ["rank", "student_name", "marks"]
+].copy()
+
+topper_display["Place"] = topper_display["rank"].map(
+    {
+        1: "1st Place",
+        2: "2nd Place"
+    }
+)
+
+topper_display = topper_display[
+    ["Place", "student_name", "marks"]
+]
+
+topper_display.columns = [
+    "Place",
+    "Student Name",
+    "Average"
+]
+
 topper_display["Average"] = topper_display["Average"].round(2)
 
-topper_display.insert(0, "S.No", range(1, len(topper_display) + 1))
+topper_display.insert(
+    0,
+    "S.No",
+    range(1, len(topper_display) + 1)
+)
 
 st.dataframe(
     topper_display,
@@ -811,6 +913,13 @@ def build_weekly_pdf():
 
     story.append(
         Paragraph(
+            f"<b>Section:</b> {selected_section}",
+            pdf_meta_style
+        )
+    )
+
+    story.append(
+        Paragraph(
             f"<b>Subject:</b> {selected_subject}",
             pdf_meta_style
         )
@@ -834,18 +943,34 @@ def build_weekly_pdf():
     story.append(Spacer(1, 5 * mm))
 
     # 1. Toppers
-    topper_pdf = toppers_df[["student_name", "marks"]].copy()
-    topper_pdf.insert(
-        0,
-        "Place",
-        ["1st Place", "2nd Place"][:len(topper_pdf)]
+    topper_pdf = toppers_df[
+        ["rank", "student_name", "marks"]
+    ].copy()
+
+    topper_pdf["Place"] = topper_pdf["rank"].map(
+        {
+            1: "1st Place",
+            2: "2nd Place"
+        }
     )
+
+    topper_pdf = topper_pdf[
+        ["Place", "student_name", "marks"]
+    ]
+
     topper_pdf.insert(
         0,
         "S.No",
         range(1, len(topper_pdf) + 1)
     )
-    topper_pdf.columns = ["S.No", "Place", "Student Name", "Average"]
+
+    topper_pdf.columns = [
+        "S.No",
+        "Place",
+        "Student Name",
+        "Average"
+    ]
+
     topper_pdf["Average"] = topper_pdf["Average"].round(2)
 
     story.extend(
