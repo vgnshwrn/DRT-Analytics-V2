@@ -327,13 +327,22 @@ df["week_name"] = df["source_file"].apply(identify_week_name)
 
 
 # ============================================================
-# MONTH MAPPING FROM REGISTERED WEEKS
+# MONTH MAPPING FROM REGISTERED WEEK NAME
 # ============================================================
+# IMPORTANT:
+# A DRT week is an academic/reporting week, not necessarily a
+# calendar week. For example, the registered "July 1st Week"
+# runs from 2026-06-29 to 2026-07-05. Its reporting month must
+# therefore be JULY, based on the registered week name, rather
+# than on start_date.month.
 
-weeks_df["month_name"] = pd.to_datetime(
-    weeks_df["start_date"],
-    errors="coerce",
-).apply(lambda x: x.strftime("%B") if not pd.isna(x) else None)
+weeks_df["month_name"] = (
+    weeks_df["week_name"]
+    .astype("string")
+    .str.strip()
+    .str.extract(r"^([A-Za-z]+)", expand=False)
+    .str.title()
+)
 
 week_to_month = dict(
     zip(weeks_df["week_name"], weeks_df["month_name"])
