@@ -692,6 +692,55 @@ improving_df = improving_df.sort_values(
 
 
 # ============================================================
+# CONTINUOUSLY DECLINING STUDENTS
+# A student qualifies only when performance decreases in every
+# consecutive week of the selected month. The student must have
+# valid marks in every week.
+# ============================================================
+
+if len(all_weeks) >= 2:
+    complete_month_df = monthly_df[
+        monthly_df[all_weeks].notna().all(axis=1)
+    ].copy()
+
+    def is_continuously_declining(row):
+        values = [float(row[w]) for w in all_weeks]
+        return all(values[i] < values[i - 1] for i in range(1, len(values)))
+
+    declining_df = complete_month_df[
+        complete_month_df.apply(is_continuously_declining, axis=1)
+    ].copy()
+
+    if not declining_df.empty:
+        declining_df["change"] = (
+            declining_df[latest_week] - declining_df[first_week]
+        )
+        declining_df = declining_df.sort_values(
+            "change", ascending=True
+        )
+else:
+    declining_df = pd.DataFrame()
+
+
+# ============================================================
+# LAST THREE STUDENTS
+# Lowest monthly average among students with at least one valid
+# weekly performance. Students with no valid performance are not
+# included.
+# ============================================================
+
+last_three_df = (
+    monthly_df
+    .sort_values(
+        ["monthly_average", "student_name"],
+        ascending=[True, True],
+    )
+    .head(3)
+    .copy()
+)
+
+
+# ============================================================
 # DISPLAY HELPERS
 # ============================================================
 
@@ -834,6 +883,60 @@ else:
     result["First Week Average"] = result["First Week Average"].round(2)
     result["Latest Week Average"] = result["Latest Week Average"].round(2)
     result["Improvement"] = result["Improvement"].round(2)
+    result.insert(0, "S.No", range(1, len(result) + 1))
+    st.dataframe(result, hide_index=True, width="stretch")
+
+
+# ============================================================
+# 5. CONTINUOUSLY DECLINING
+# ============================================================
+
+st.divider()
+st.subheader("5. Students Declining Continuously")
+st.caption(
+    "Students whose performance decreases in every consecutive week of the selected month."
+)
+
+if declining_df.empty:
+    show_empty("No students show continuous decline across every week of the selected month.")
+else:
+    result = declining_df[
+        ["student_name", first_week, latest_week, "change"]
+    ].copy()
+    result.columns = [
+        "Student Name",
+        "First Week Average",
+        "Latest Week Average",
+        "Overall Change",
+    ]
+    result["First Week Average"] = result["First Week Average"].round(2)
+    result["Latest Week Average"] = result["Latest Week Average"].round(2)
+    result["Overall Change"] = result["Overall Change"].round(2)
+    result.insert(0, "S.No", range(1, len(result) + 1))
+    st.dataframe(result, hide_index=True, width="stretch")
+
+
+# ============================================================
+# 6. LAST THREE STUDENTS
+# ============================================================
+
+st.divider()
+st.subheader("6. Last Three Students")
+st.caption(
+    "Three students with the lowest monthly average among students with valid performance."
+)
+
+if last_three_df.empty:
+    show_empty("No valid student performance is available for this selection.")
+else:
+    result = last_three_df[
+        ["student_name", "monthly_average"]
+    ].copy()
+    result.columns = [
+        "Student Name",
+        "Monthly Average",
+    ]
+    result["Monthly Average"] = result["Monthly Average"].round(2)
     result.insert(0, "S.No", range(1, len(result) + 1))
     st.dataframe(result, hide_index=True, width="stretch")
 
@@ -1041,6 +1144,42 @@ def build_pdf():
             ["S.No", "student_name", first_week, latest_week, "change"],
             ["S.No", "Student Name", "First Week", "Latest Week", "Improvement"],
             [13 * mm, 70 * mm, 27 * mm, 27 * mm, 27 * mm],
+        ))
+
+    # Continuously declining
+    story.append(Paragraph("5. Students Declining Continuously", section_style))
+
+    if declining_df.empty:
+        story.append(Paragraph(
+            "No students show continuous decline across every week of the selected month.",
+            normal_style,
+        ))
+    else:
+        pdf_df = declining_df.copy()
+        pdf_df.insert(0, "S.No", range(1, len(pdf_df) + 1))
+        story.append(pdf_table(
+            pdf_df,
+            ["S.No", "student_name", first_week, latest_week, "change"],
+            ["S.No", "Student Name", "First Week", "Latest Week", "Overall Change"],
+            [13 * mm, 70 * mm, 27 * mm, 27 * mm, 27 * mm],
+        ))
+
+    # Last three
+    story.append(Paragraph("6. Last Three Students", section_style))
+
+    if last_three_df.empty:
+        story.append(Paragraph(
+            "No valid student performance is available for this selection.",
+            normal_style,
+        ))
+    else:
+        pdf_df = last_three_df.copy()
+        pdf_df.insert(0, "S.No", range(1, len(pdf_df) + 1))
+        story.append(pdf_table(
+            pdf_df,
+            ["S.No", "student_name", "monthly_average"],
+            ["S.No", "Student Name", "Monthly Average"],
+            [16 * mm, 105 * mm, 40 * mm],
         ))
 
     # Method note
