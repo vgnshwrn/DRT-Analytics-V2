@@ -340,29 +340,43 @@ def identify_week_name(source_file):
 
     name = str(source_file).lower().strip()
 
-    # Remove file extensions and common punctuation.
-    name = re.sub(r"\.(xlsx|xls|numbers|csv)$", "", name)
-    name = re.sub(r"[^a-z0-9]+", " ", name)
+    # Remove file extension
+    name = re.sub(
+        r"\.(xlsx|xls|numbers|csv)$",
+        "",
+        name
+    )
 
-    # June
+    # Normalize punctuation/spaces
+    name = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        name
+    ).strip()
+
+    # ========================================================
+    # JUNE
+    # ========================================================
+
     if "june" in name and (
         "3rd" in name
-        or "3 rd" in name
         or "third" in name
     ):
         return "June 3rd Week"
 
     if "june" in name and (
         "4th" in name
-        or "4 th" in name
         or "fourth" in name
     ):
         return "June 4th Week"
 
-    # July
+
+    # ========================================================
+    # JULY
+    # ========================================================
+
     if "july" in name and (
         "1st" in name
-        or "1 st" in name
         or "ist" in name
         or "first" in name
     ):
@@ -370,7 +384,6 @@ def identify_week_name(source_file):
 
     if "july" in name and (
         "2nd" in name
-        or "2 nd" in name
         or "iind" in name
         or "second" in name
     ):
@@ -378,7 +391,6 @@ def identify_week_name(source_file):
 
     if "july" in name and (
         "3rd" in name
-        or "3 rd" in name
         or "iiird" in name
         or "third" in name
     ):
@@ -386,19 +398,58 @@ def identify_week_name(source_file):
 
     if "july" in name and (
         "4th" in name
-        or "4 th" in name
         or "ivth" in name
         or "fourth" in name
     ):
         return "July 4th Week"
 
+
+    # ========================================================
+    # AUGUST
+    # ========================================================
+
+    if "august" in name and (
+        "2nd" in name
+        or "iind" in name
+        or "second" in name
+    ):
+        return "August 2nd Week"
+
+    if "august" in name and (
+        "3rd" in name
+        or "iiird" in name
+        or "third" in name
+    ):
+        return "August 3rd Week"
+
+    if "august" in name and (
+        "4th" in name
+        or "ivth" in name
+        or "fourth" in name
+    ):
+        return "August 4th Week"
+
+
+    # ========================================================
+    # SEPTEMBER
+    # ========================================================
+
+    if "september" in name and (
+        "1st" in name
+        or "ist" in name
+        or "first" in name
+    ):
+        return "September 1st Week"
+
+    if "september" in name and (
+        "2nd" in name
+        or "iind" in name
+        or "second" in name
+    ):
+        return "September 2nd Week"
+
+
     return None
-
-
-df["week_name"] = df["source_file"].apply(
-    identify_week_name
-)
-
 
 # ============================================================
 # VALIDATION
