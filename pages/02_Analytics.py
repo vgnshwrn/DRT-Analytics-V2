@@ -450,6 +450,9 @@ def identify_week_name(source_file):
 
 
     return None
+# Identify the registered DRT week for each source file
+
+df["week_name"] = df["source_file"].apply(identify_week_name)
 
 # ============================================================
 # VALIDATION
