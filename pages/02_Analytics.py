@@ -424,6 +424,7 @@ def identify_week_name(source_file):
 
     if "august" in name and (
         "4th" in name
+        or "iv" in name
         or "ivth" in name
         or "fourth" in name
     ):
